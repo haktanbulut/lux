@@ -1,0 +1,15 @@
+extern "C"
+    fn printf(fmt: *Char, ...) -> Int
+
+fn main() -> Int
+    let nums = [1, 2, 3, 4, 5]
+    printf("nums[0] = %d\n", nums[0])
+    printf("nums[2] = %d\n", nums[2])
+    printf("nums[4] = %d\n", nums[4])
+
+    let names = [10, 20, 30]
+    var sum = 0
+    sum = names[0] + names[1] + names[2]
+    printf("sum = %d\n", sum)
+
+    return 0

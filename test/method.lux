@@ -1,0 +1,22 @@
+extern "C"
+    fn printf(fmt: *Char, ...) -> Int
+
+type Point
+    x: Int
+    y: Int
+
+fn Point.magnitude_sq(self) -> Int
+    return self.x * self.x + self.y * self.y
+
+fn Point.translate(self, dx: Int, dy: Int) -> Point
+    return Point(self.x + dx, self.y + dy)
+
+fn main() -> Int
+    let p = Point(3, 4)
+    let m = p.magnitude_sq()
+    printf("magnitude_sq = %d\n", m)
+
+    let p2 = p.translate(10, 20)
+    printf("translated = (%d, %d)\n", p2.x, p2.y)
+
+    return 0

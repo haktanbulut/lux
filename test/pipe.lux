@@ -1,0 +1,15 @@
+extern "C"
+    fn printf(fmt: *Char, ...) -> Int
+
+fn double(x: Int) -> Int
+    return x * 2
+
+fn add(x: Int, y: Int) -> Int
+    return x + y
+
+fn main() -> Int
+    let a = 5 |> double
+    printf("5 |> double = %d\n", a)
+    let b = 5 |> add(3)
+    printf("5 |> add(3) = %d\n", b)
+    return 0

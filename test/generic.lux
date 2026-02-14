@@ -1,0 +1,37 @@
+extern "C"
+    fn printf(fmt: *Char, ...) -> Int
+
+fn identity[T](x: T) -> T
+    return x
+
+fn max[T](a: T, b: T) -> T
+    if a > b
+        return a
+    return b
+
+fn add[T](a: T, b: T) -> T
+    return a + b
+
+fn main() -> Int
+    let x = identity(42)
+    printf("identity(42) = %d\n", x)
+
+    let y = identity(100)
+    printf("identity(100) = %d\n", y)
+
+    let m = max(10, 20)
+    printf("max(10, 20) = %d\n", m)
+
+    let m2 = max(99, 42)
+    printf("max(99, 42) = %d\n", m2)
+
+    let s = add(3, 4)
+    printf("add(3, 4) = %d\n", s)
+
+    let f = add(1.5, 2.5)
+    printf("add(1.5, 2.5) = %f\n", f)
+
+    let fm = max(3.14, 2.71)
+    printf("max(3.14, 2.71) = %f\n", fm)
+
+    return 0

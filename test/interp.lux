@@ -1,0 +1,15 @@
+extern "C"
+    fn printf(fmt: *Char, ...) -> Int
+
+fn main() -> Int
+    let name = "world"
+    let x = 42
+    let msg = "Hello, {name}! x = {x}"
+    printf("%s\n", msg)
+
+    let a = 10
+    let b = 20
+    let sum_msg = "{a} + {b} = {a + b}"
+    printf("%s\n", sum_msg)
+
+    return 0

@@ -1,0 +1,18 @@
+extern "C"
+    fn printf(fmt: *Char, ...) -> Int
+
+fn swap(a: Int, b: Int) -> (Int, Int)
+    return (b, a)
+
+fn main() -> Int
+    let t = (1, 2, 3)
+    printf("tuple: (%d, %d, %d)\n", t[0], t[1], t[2])
+
+    let (x, y) = swap(10, 20)
+    printf("swap: (%d, %d)\n", x, y)
+
+    let pair = (42, 99)
+    let (a, b) = pair
+    printf("destructure: (%d, %d)\n", a, b)
+
+    return 0

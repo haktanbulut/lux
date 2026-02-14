@@ -1,0 +1,23 @@
+extern "C"
+    fn printf(fmt: *Char, ...) -> Int
+
+fn main() -> Int
+    let squares = [i * i for i in 0..5]
+    printf("squares:")
+    printf(" %d", squares[0])
+    printf(" %d", squares[1])
+    printf(" %d", squares[2])
+    printf(" %d", squares[3])
+    printf(" %d", squares[4])
+    printf("\n")
+
+    let evens = [i for i in 0..10 if i % 2 == 0]
+    printf("evens:")
+    printf(" %d", evens[0])
+    printf(" %d", evens[1])
+    printf(" %d", evens[2])
+    printf(" %d", evens[3])
+    printf(" %d", evens[4])
+    printf("\n")
+
+    return 0

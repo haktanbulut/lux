@@ -1,0 +1,14 @@
+extern "C"
+    fn printf(fmt: *Char, ...) -> Int
+
+fn apply(f: fn(Int) -> Int, x: Int) -> Int
+    return f(x)
+
+fn main() -> Int
+    let result = apply(fn(x: Int) x * 2, 21)
+    printf("apply(double, 21) = %d\n", result)
+
+    let triple = apply(fn(x: Int) x * 3, 10)
+    printf("apply(triple, 10) = %d\n", triple)
+
+    return 0

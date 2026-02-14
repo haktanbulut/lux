@@ -1,0 +1,82 @@
+extern "C"
+    fn lux_init_window(w: Int, h: Int, title: *Char)
+    fn lux_close_window()
+    fn lux_window_should_close() -> Int
+    fn lux_set_target_fps(fps: Int)
+    fn lux_begin_drawing()
+    fn lux_end_drawing()
+    fn lux_clear_background(r: Int, g: Int, b: Int, a: Int)
+    fn lux_is_key_down(key: Int) -> Int
+    fn lux_is_key_pressed(key: Int) -> Int
+    fn lux_get_frame_time() -> Float
+
+    fn game_init()
+    fn game_reset()
+    fn game_ship_thrust(dt: Float)
+    fn game_ship_rotate(dir: Float, dt: Float)
+    fn game_shoot()
+    fn game_update_ship(dt: Float) -> Int
+    fn game_update_bullets(dt: Float) -> Int
+    fn game_update_asteroids(dt: Float) -> Int
+    fn game_maybe_spawn(dt: Float) -> Int
+    fn game_check_collisions() -> Int
+    fn game_draw_ship()
+    fn game_draw_asteroids()
+    fn game_draw_bullets()
+    fn game_draw_hud()
+    fn game_get_score() -> Int
+    fn game_is_over() -> Int
+    fn game_get_lives() -> Int
+
+fn update_physics(dt: Float) -> Int
+    game_update_bullets(dt)
+    game_update_asteroids(dt)
+    return 0
+
+fn handle_spawning(dt: Float) -> Int
+    game_maybe_spawn(dt)
+    return 0
+
+fn main() -> Int
+    lux_init_window(800, 600, "Lux Asteroids")
+    lux_set_target_fps(60)
+    game_init()
+
+    loop
+        if lux_window_should_close() != 0
+            break
+
+        let dt = lux_get_frame_time()
+
+        if game_is_over() != 0
+            if lux_is_key_pressed(82) != 0
+                game_reset()
+        else
+            if lux_is_key_down(265) != 0
+                game_ship_thrust(dt)
+            if lux_is_key_down(263) != 0
+                game_ship_rotate(-1.0, dt)
+            if lux_is_key_down(262) != 0
+                game_ship_rotate(1.0, dt)
+            if lux_is_key_pressed(32) != 0
+                game_shoot()
+
+        let t_phys = spawn update_physics(dt)
+        let t_spawn = spawn handle_spawning(dt)
+        game_update_ship(dt)
+        await t_phys
+        await t_spawn
+
+        let t_coll = spawn game_check_collisions()
+        let hits = await t_coll
+
+        lux_begin_drawing()
+        lux_clear_background(10, 10, 20, 255)
+        game_draw_asteroids()
+        game_draw_bullets()
+        game_draw_ship()
+        game_draw_hud()
+        lux_end_drawing()
+
+    lux_close_window()
+    return 0

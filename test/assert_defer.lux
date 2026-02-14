@@ -1,0 +1,19 @@
+extern "C"
+    fn printf(fmt: *Char, ...) -> Int
+
+fn test_assert()
+    assert 1 == 1
+    printf("assert 1==1 passed\n")
+    assert true
+    printf("assert true passed\n")
+
+fn test_defer()
+    defer printf("deferred 1\n")
+    defer printf("deferred 2\n")
+    printf("before return\n")
+    return
+
+fn main() -> Int
+    test_assert()
+    test_defer()
+    return 0

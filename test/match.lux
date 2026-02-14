@@ -1,0 +1,32 @@
+extern "C"
+    fn printf(fmt: *Char, ...) -> Int
+
+fn describe(x: Int) -> Int
+    match x
+        0 -> printf("zero\n")
+        1 -> printf("one\n")
+        2 -> printf("two\n")
+        _ -> printf("other: %d\n", x)
+    return 0
+
+fn classify(x: Int) -> Int
+    match x
+        1 | 2 | 3 -> printf("small\n")
+        _ -> printf("big\n")
+    return 0
+
+fn main() -> Int
+    describe(0)
+    describe(1)
+    describe(2)
+    describe(5)
+
+    classify(2)
+    classify(10)
+
+    let t = (1, 2)
+    match t
+        (1, 2) -> printf("matched (1,2)\n")
+        _ -> printf("no match\n")
+
+    return 0

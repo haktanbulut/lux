@@ -1,0 +1,492 @@
+(* ======================================================================== *)
+(* Lux Programming Language — Formal EBNF Grammar                         *)
+(* ======================================================================== *)
+(* Notation:                                                               *)
+(*   =   definition          |   alternative                              *)
+(*   [ ] optional (0 or 1)   { } repetition (0 or more)                   *)
+(*   ( ) grouping            " " terminal string                          *)
+(*   ;   end of rule         (* *) comment                                *)
+(*   INDENT / DEDENT — synthetic tokens emitted by the lexer              *)
+(*   NEWLINE        — newline token (significant, statement terminator)    *)
+(* ======================================================================== *)
+
+
+(* ======================== 1. Top-Level Structure ======================== *)
+
+program           = { top_level_item } EOF ;
+
+top_level_item    = import_decl
+                  | type_decl
+                  | trait_decl
+                  | fn_decl
+                  | method_decl
+                  | const_decl
+                  | extern_block
+                  | attribute_item ;
+
+attribute_item    = { attribute NEWLINE } top_level_item ;
+
+
+(* ======================== 2. Imports ======================== *)
+
+import_decl       = "import" import_path [ import_select ] NEWLINE ;
+
+import_path       = ident { "." ident } ;
+
+import_select     = "." "{" import_name { "," import_name } [ "," ] "}"
+                  | "." "*" ;
+
+import_name       = ident [ "as" ident ] ;
+
+
+(* ======================== 3. Type Declarations ======================== *)
+
+type_decl         = { attribute NEWLINE }
+                    "type" type_name [ type_params ] type_body NEWLINE ;
+
+type_name         = UPPER_IDENT ;
+
+type_body         = record_body                   (* record / struct *)
+                  | NEWLINE INDENT variant_list DEDENT   (* enum / ADT *)
+                  | "=" type_expr                  (* type alias *)  ;
+
+record_body       = NEWLINE INDENT field_list DEDENT
+                  | "{" field_list_inline "}" ;
+
+field_list        = field_def { NEWLINE field_def } ;
+field_list_inline = field_def { "," field_def } [ "," ] ;
+
+field_def         = ident ":" type_expr [ "=" expr ] ;
+
+variant_list      = variant { NEWLINE variant } ;
+
+variant           = UPPER_IDENT [ variant_payload ] ;
+
+variant_payload   = "(" variant_fields ")"
+                  | record_body ;
+
+variant_fields    = variant_field { "," variant_field } [ "," ] ;
+
+variant_field     = [ ident ":" ] type_expr ;
+
+
+(* ======================== 4. Type Expressions ======================== *)
+
+type_expr         = type_primary { "|" type_primary }   (* union types *) ;
+
+type_primary      = type_path [ type_args ]
+                  | "fn" "(" [ type_list ] ")" [ "->" type_expr ]
+                  | "(" type_list ")"                   (* tuple *)
+                  | "[" type_expr "]"                    (* list shorthand *)
+                  | "{" type_expr ":" type_expr "}"      (* map shorthand *)
+                  | "Self" ;
+
+type_path         = UPPER_IDENT { "." UPPER_IDENT } ;
+
+type_args         = "[" type_list "]" ;
+
+type_list         = type_expr { "," type_expr } [ "," ] ;
+
+type_params       = "[" type_param { "," type_param } [ "," ] "]" ;
+
+type_param        = UPPER_IDENT [ ":" type_constraint ] ;
+
+type_constraint   = type_path { "+" type_path } ;
+
+
+(* ======================== 5. Trait Declarations ======================== *)
+
+trait_decl        = "trait" UPPER_IDENT [ type_params ] [ ":" type_constraint ]
+                    NEWLINE INDENT trait_body DEDENT ;
+
+trait_body        = { trait_member NEWLINE } ;
+
+trait_member       = fn_signature                         (* required *)
+                  | fn_decl ;                              (* default impl *)
+
+
+(* ======================== 6. Function Declarations ======================== *)
+
+fn_decl           = { attribute NEWLINE }
+                    fn_signature NEWLINE INDENT block DEDENT ;
+
+fn_signature      = "fn" ident [ type_params ]
+                    "(" [ param_list ] ")" [ "->" type_expr ] ;
+
+(* multi-head function: same name, different patterns *)
+fn_decl           = fn_decl
+                  | { attribute NEWLINE }
+                    "fn" ident "(" pattern_list ")" [ "->" type_expr ]
+                    NEWLINE INDENT block DEDENT ;
+
+method_decl       = { attribute NEWLINE }
+                    "fn" type_path "." ident [ type_params ]
+                    "(" [ param_list ] ")" [ "->" type_expr ]
+                    NEWLINE INDENT block DEDENT ;
+
+param_list        = param { "," param } [ "," ] ;
+
+param             = pattern ":" type_expr [ "=" expr ]    (* typed, opt default *)
+                  | "self"                                 (* receiver *) ;
+
+(* anonymous / lambda functions *)
+lambda            = "fn" "(" [ param_list_short ] ")" expr
+                  | "fn" "(" [ param_list_short ] ")"
+                    NEWLINE INDENT block DEDENT ;
+
+param_list_short  = param_short { "," param_short } [ "," ] ;
+param_short       = ident [ ":" type_expr ] ;
+
+
+(* ======================== 7. Constants ======================== *)
+
+const_decl        = "const" UPPER_IDENT [ ":" type_expr ] "=" expr NEWLINE ;
+
+
+(* ======================== 8. Statements & Block ======================== *)
+
+block             = { statement NEWLINE } ;
+
+statement         = let_stmt
+                  | var_stmt
+                  | assign_stmt
+                  | return_stmt
+                  | break_stmt
+                  | continue_stmt
+                  | defer_stmt
+                  | expr ;
+
+let_stmt          = "let" pattern [ ":" type_expr ] "=" expr ;
+
+var_stmt          = "var" ident [ ":" type_expr ] "=" expr ;
+
+assign_stmt       = place_expr assign_op expr ;
+
+assign_op         = "=" | "+=" | "-=" | "*=" | "/=" | "%="
+                  | "&&=" | "||=" | "<<=" | ">>=" | "&=" | "|=" | "^=" ;
+
+place_expr        = ident { accessor }  ;
+accessor          = "." ident | "[" expr "]" ;
+
+return_stmt       = "return" [ expr ] ;
+
+break_stmt        = "break" [ ident ] [ expr ] ;
+
+continue_stmt     = "continue" [ ident ] ;
+
+defer_stmt        = "defer" ( expr | NEWLINE INDENT block DEDENT ) ;
+
+
+(* ======================== 9. Expressions ======================== *)
+
+expr              = pipe_expr ;
+
+(* Pipe: lowest precedence expression-level operator *)
+pipe_expr         = or_expr { "|>" pipe_target } ;
+
+pipe_target       = ident [ call_args ]                (* f(piped, ...) *)
+                  | ident call_args_placeholder         (* f(x, _, y) *)
+                  | lambda ;
+
+call_args_placeholder = "(" arg_or_placeholder { "," arg_or_placeholder } ")" ;
+arg_or_placeholder    = "_" | expr ;
+
+(* Logical OR *)
+or_expr           = and_expr { "or" and_expr } ;
+
+(* Logical AND *)
+and_expr          = not_expr { "and" not_expr } ;
+
+(* Logical NOT *)
+not_expr          = [ "not" ] comparison ;
+
+(* Comparisons — non-associative *)
+comparison        = range_expr [ comp_op range_expr ] ;
+
+comp_op           = "==" | "!=" | "<" | ">" | "<=" | ">=" | "is" ;
+
+(* Range *)
+range_expr        = bitor_expr [ ( ".." | "..=" ) bitor_expr ] ;
+
+(* Bitwise OR *)
+bitor_expr        = bitxor_expr { "|" bitxor_expr } ;
+
+(* Bitwise XOR *)
+bitxor_expr       = bitand_expr { "^" bitand_expr } ;
+
+(* Bitwise AND *)
+bitand_expr       = shift_expr { "&" shift_expr } ;
+
+(* Bit shift *)
+shift_expr        = add_expr { ( "<<" | ">>" ) add_expr } ;
+
+(* Additive *)
+add_expr          = mul_expr { ( "+" | "-" ) mul_expr } ;
+
+(* Multiplicative *)
+mul_expr          = unary_expr { ( "*" | "/" | "%" ) unary_expr } ;
+
+(* Unary *)
+unary_expr        = [ "-" | "~" ] postfix_expr ;
+
+(* Postfix: calls, field access, index, try (?) *)
+postfix_expr      = primary { postfix_op } ;
+
+postfix_op        = "(" [ arg_list ] ")"         (* function call *)
+                  | "." ident                     (* field / method access *)
+                  | "[" expr "]"                  (* index *)
+                  | "?"                           (* try / propagate *)
+                  | "!"                           (* mutating method marker *) ;
+
+arg_list          = arg { "," arg } [ "," ] ;
+arg               = [ ident ":" ] expr ;          (* named or positional *)
+
+(* Primary expressions *)
+primary           = literal
+                  | ident
+                  | type_path                     (* enum variant constructor *)
+                  | "(" expr ")"                  (* grouping *)
+                  | "(" expr "," tuple_rest ")"   (* tuple *)
+                  | "[" [ list_items ] "]"         (* list literal *)
+                  | "{" [ map_items ] "}"          (* map / record literal *)
+                  | if_expr
+                  | match_expr
+                  | for_expr
+                  | while_expr
+                  | loop_expr
+                  | spawn_expr
+                  | await_expr
+                  | scope_expr
+                  | comptime_expr
+                  | lambda
+                  | block_expr ;
+
+tuple_rest        = expr { "," expr } [ "," ] ;
+
+block_expr        = "do" NEWLINE INDENT block DEDENT ;
+
+
+(* ======================== 10. Literals ======================== *)
+
+literal           = INT_LIT
+                  | FLOAT_LIT
+                  | STRING_LIT
+                  | MULTILINE_STRING_LIT
+                  | CHAR_LIT
+                  | BOOL_LIT
+                  | "none"              (* Option.None sugar *) ;
+
+BOOL_LIT          = "true" | "false" ;
+
+INT_LIT           = decimal_int | hex_int | oct_int | bin_int ;
+decimal_int       = digit { digit | "_" } ;
+hex_int           = "0x" hex_digit { hex_digit | "_" } ;
+oct_int           = "0o" oct_digit { oct_digit | "_" } ;
+bin_int           = "0b" ( "0" | "1" ) { "0" | "1" | "_" } ;
+
+FLOAT_LIT         = digit { digit | "_" } "." digit { digit | "_" }
+                    [ ( "e" | "E" ) [ "+" | "-" ] digit { digit } ] ;
+
+STRING_LIT        = '"' { str_char | str_interp } '"' ;
+str_char          = ? any char except ", \, {, newline ?
+                  | escape_seq ;
+str_interp        = "{" expr "}" ;
+escape_seq        = "\\" ( "n" | "r" | "t" | "\\" | '"' | "{" | "0"
+                         | "x" hex_digit hex_digit
+                         | "u" "{" hex_digit { hex_digit } "}" ) ;
+
+MULTILINE_STRING_LIT = '"""' NEWLINE { ? any char ? | str_interp } '"""' ;
+
+CHAR_LIT          = "'" ( ? any single char ? | escape_seq ) "'" ;
+
+hex_digit         = digit | "a".."f" | "A".."F" ;
+oct_digit         = "0".."7" ;
+
+list_items        = expr { "," expr } [ "," ]
+                  | expr "for" pattern "in" expr [ "if" expr ] ;   (* comprehension *)
+
+map_items         = map_entry { "," map_entry } [ "," ]
+                  | map_entry "for" pattern "in" expr [ "if" expr ] ;
+
+map_entry         = expr ":" expr
+                  | ident                         (* shorthand: name == name: name *)
+                  | ".." expr ;                   (* spread *)
+
+
+(* ======================== 11. Control Flow Expressions ======================== *)
+
+if_expr           = "if" expr NEWLINE INDENT block DEDENT
+                    { "elif" expr NEWLINE INDENT block DEDENT }
+                    [ "else" NEWLINE INDENT block DEDENT ] ;
+
+(* inline if for single expressions *)
+if_expr           = if_expr
+                  | "if" expr "then" expr "else" expr ;
+
+match_expr        = "match" expr NEWLINE INDENT match_arms DEDENT ;
+
+match_arms        = match_arm { NEWLINE match_arm } ;
+
+match_arm         = pattern [ "if" expr ] "->" arm_body ;
+
+arm_body          = expr
+                  | NEWLINE INDENT block DEDENT ;
+
+for_expr          = [ label ] "for" pattern "in" expr
+                    NEWLINE INDENT block DEDENT ;
+
+while_expr        = [ label ] "while" expr
+                    NEWLINE INDENT block DEDENT ;
+
+loop_expr         = [ label ] "loop"
+                    NEWLINE INDENT block DEDENT ;
+
+label             = "'" ident ;
+
+spawn_expr        = "spawn" expr
+                  | "spawn" NEWLINE INDENT block DEDENT ;
+
+await_expr        = "await" expr ;
+
+scope_expr        = "scope" lambda ;
+
+comptime_expr     = "comptime" NEWLINE INDENT block DEDENT
+                  | "comptime" expr ;
+
+
+(* ======================== 12. Patterns ======================== *)
+
+pattern           = or_pattern ;
+
+or_pattern        = base_pattern { "|" base_pattern } ;
+
+base_pattern      = "_"                                        (* wildcard *)
+                  | ident                                       (* binding *)
+                  | literal                                     (* literal match *)
+                  | type_path [ "(" pattern_list ")" ]          (* variant destructure *)
+                  | "(" pattern_list ")"                        (* tuple *)
+                  | "[" [ pattern_list ] "]"                    (* list *)
+                  | "[" pattern { "," pattern } "," ".." [ ident ] "]"
+                                                                (* list with rest *)
+                  | "{" field_pattern_list "}"                  (* record *)
+                  | ident "@" pattern                           (* binding + pattern *)
+                  | ".." [ ident ] ;                            (* rest pattern *)
+
+pattern_list      = pattern { "," pattern } [ "," ] ;
+
+field_pattern_list = field_pattern { "," field_pattern } [ "," ] ;
+
+field_pattern     = ident ":" pattern                  (* field: subpattern *)
+                  | ident                               (* shorthand: field name = binding *)
+                  | ".." ;                              (* ignore remaining fields *)
+
+
+(* ======================== 13. Attributes / Annotations ======================== *)
+
+attribute         = "@" attribute_name [ attribute_args ] ;
+
+attribute_name    = ident ;
+
+attribute_args    = "(" attr_arg { "," attr_arg } [ "," ] ")" ;
+
+attr_arg          = ident ":" expr
+                  | expr ;
+
+(* Derive is a special built-in attribute *)
+(* @derive(Eq, Hash, Debug, Serialize) *)
+
+(* Test attribute *)
+(* #[test]  or  @test — we use the @ form for consistency *)
+
+test_attribute    = "@" "test" [ "(" test_opts ")" ] ;
+test_opts         = ident { "," ident } ;
+(* e.g.  @test  or  @test(property)  *)
+
+
+(* ======================== 14. Extern / FFI ======================== *)
+
+extern_block      = "extern" STRING_LIT NEWLINE INDENT
+                    { extern_decl NEWLINE } DEDENT ;
+
+extern_decl       = "fn" ident "(" [ extern_param_list ] ")"
+                    [ "->" type_expr ] ;
+
+extern_param_list = extern_param { "," extern_param } [ "," ] ;
+
+extern_param      = [ ident ":" ] type_expr
+                  | "..." ;                        (* C variadic *)
+
+export_attr       = "@" "export" ;
+
+
+(* ======================== 15. Operators (precedence summary) ======================== *)
+
+(* From lowest to highest precedence:                                      *)
+(*                                                                         *)
+(*   1.  |>              pipe (left-to-right)                              *)
+(*   2.  or              logical or                                        *)
+(*   3.  and             logical and                                       *)
+(*   4.  not             logical not (unary)                               *)
+(*   5.  == != < > <= >= is    comparisons (non-associative)               *)
+(*   6.  .. ..=          range                                             *)
+(*   7.  |               bitwise or                                        *)
+(*   8.  ^               bitwise xor                                       *)
+(*   9.  &               bitwise and                                       *)
+(*  10.  << >>           bit shift                                         *)
+(*  11.  + -             additive                                          *)
+(*  12.  * / %           multiplicative                                    *)
+(*  13.  - ~ (unary)     unary prefix                                      *)
+(*  14.  () . [] ? !     postfix (call, access, index, try, mutate)        *)
+
+
+(* ======================== 16. Lexical Rules ======================== *)
+
+UPPER_IDENT       = "A".."Z" { letter | digit } ;
+ident             = ( "a".."z" | "_" ) { letter | digit } ;
+letter            = "a".."z" | "A".."Z" | "_" ;
+digit             = "0".."9" ;
+
+(* Keywords — reserved, cannot be used as identifiers *)
+keyword           = "and" | "as" | "await" | "break" | "comptime" | "const"
+                  | "continue" | "defer" | "do" | "elif" | "else" | "extern"
+                  | "false" | "fn" | "for" | "if" | "import" | "in" | "is"
+                  | "let" | "loop" | "match" | "mut" | "none" | "not" | "or"
+                  | "return" | "scope" | "self" | "Self" | "spawn" | "then"
+                  | "trait" | "true" | "type" | "var" | "while" | "with" ;
+
+(* Comments *)
+line_comment      = "--" { ? any char except newline ? } NEWLINE ;
+block_comment     = "{-" { ? any char ? | block_comment } "-}" ;
+                  (* block comments nest correctly *)
+
+(* Whitespace — significant for indentation at line start *)
+(* The lexer tracks indentation level and emits INDENT / DEDENT tokens.   *)
+(* Within a line, whitespace is not significant.                           *)
+(* Lines inside (), [], or {} are continuation lines — indentation rules   *)
+(* are suspended (implicit line continuation, like Python).                *)
+
+
+(* ======================== 17. with-expression (record update) ======================== *)
+
+(* record update / functional copy *)
+with_expr         = postfix_expr "with" "{" field_update_list "}" ;
+
+field_update_list = field_update { "," field_update } [ "," ] ;
+
+field_update      = ident ":" expr
+                  | ident ;                       (* shorthand *)
+
+(* "with" integrates into the postfix level *)
+postfix_expr      = primary { postfix_op }
+                  | postfix_expr "with" "{" field_update_list "}" ;
+
+
+(* ======================== 18. Assert (built-in statement) ======================== *)
+
+statement         = statement                     (* extends rule from §8 *)
+                  | assert_stmt ;
+
+assert_stmt       = "assert" expr [ "," STRING_LIT ] ;
+
+
+(* ======================== END ======================== *)

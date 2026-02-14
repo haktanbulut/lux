@@ -1,0 +1,148 @@
+-- Hello World in Lux
+-- Tests major language features for parser verification
+
+import std.io
+import std.collections.{HashMap, Vec as Vector}
+
+-- Type alias
+type Name = String
+
+-- Record type
+type Point
+    x: Float
+    y: Float
+
+-- Enum / ADT type
+type Shape
+    Circle(radius: Float)
+    Rectangle(width: Float, height: Float)
+    Triangle(Point, Point, Point)
+
+-- Generic type
+type Option[T]
+    Some(T)
+    None
+
+-- Trait
+trait Printable
+    fn to_string(self) -> String
+
+-- Trait with default impl
+trait HasArea
+    fn area(self) -> Float
+    fn describe(self) -> String
+        return "area = {self.area()}"
+
+-- Constant
+const MAX_SIZE: Int = 1024
+
+-- Function
+fn greet(name: String) -> String
+    return "Hello, {name}!"
+
+-- Method on type
+fn Point.distance(self, other: Point) -> Float
+    let dx = other.x - self.x
+    let dy = other.y - self.y
+    return (dx * dx + dy * dy)
+
+-- Method with type params
+fn Option.map[U](self, f: fn(T) -> U) -> Option[U]
+    match self
+        Some(x) -> Some(f(x))
+        None -> None
+
+-- Pattern matching
+fn describe_shape(shape: Shape) -> String
+    match shape
+        Circle(r) -> "circle with radius {r}"
+        Rectangle(w, h) -> "rectangle {w}x{h}"
+        Triangle(a, b, c) -> "triangle"
+
+-- If expression
+fn abs(x: Int) -> Int
+    if x < 0
+        return -x
+    else
+        return x
+
+-- Inline if
+fn max(a: Int, b: Int) -> Int
+    return if a > b then a else b
+
+-- For loop
+fn sum(items: [Int]) -> Int
+    var total: Int = 0
+    for item in items
+        total += item
+    return total
+
+-- While loop
+fn countdown(n: Int) -> Int
+    var i: Int = n
+    while i > 0
+        i -= 1
+    return i
+
+-- Pipe operator
+fn process(data: [Int]) -> [Int]
+    let result = (data
+        |> filter(fn(x) x > 0)
+        |> map(fn(x) x * 2))
+    return result
+
+-- List comprehension
+fn squares(n: Int) -> [Int]
+    return [x * x for x in 0..n]
+
+-- Map literal and comprehension
+fn make_index(items: [String]) -> {String: Int}
+    return {item: i for (item, i) in items}
+
+-- Lambda functions
+fn apply(f: fn(Int) -> Int, x: Int) -> Int
+    return f(x)
+
+-- Do block expression
+fn complex_calc(x: Int) -> Int
+    let result = do
+        let a = x * 2
+        let b = a + 1
+        b * b
+    return result
+
+-- Defer statement
+fn with_cleanup() -> Int
+    defer print("cleanup done")
+    return 42
+
+-- Assert
+fn safe_divide(a: Int, b: Int) -> Int
+    assert b != 0, "division by zero"
+    return a / b
+
+-- Let with pattern matching
+fn swap(pair: (Int, Int)) -> (Int, Int)
+    let (a, b) = pair
+    return (b, a)
+
+-- Record update with 'with'
+fn move_point(p: Point, dx: Float, dy: Float) -> Point
+    return p with { x: p.x + dx, y: p.y + dy }
+
+-- Main entry point
+fn main()
+    let msg = greet("World")
+    print(msg)
+
+    let p = {x: 3.0, y: 4.0}
+    let circle = Circle(5.0)
+    let desc = describe_shape(circle)
+    print(desc)
+
+    let numbers = [1, 2, 3, 4, 5]
+    let total = sum(numbers)
+    print("Sum: {total}")
+
+    let doubled = apply(fn(x) x * 2, 21)
+    print("Doubled: {doubled}")

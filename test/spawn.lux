@@ -1,0 +1,22 @@
+extern "C"
+    fn printf(fmt: *Char, ...) -> Int
+
+fn compute(x: Int) -> Int
+    return x * x
+
+fn add(a: Int, b: Int) -> Int
+    return a + b
+
+fn main() -> Int
+    let t1 = spawn compute(7)
+    let t2 = spawn compute(8)
+    let r1 = await t1
+    let r2 = await t2
+    printf("compute(7) = %d\n", r1)
+    printf("compute(8) = %d\n", r2)
+
+    let t3 = spawn add(10, 20)
+    let r3 = await t3
+    printf("add(10, 20) = %d\n", r3)
+
+    return 0

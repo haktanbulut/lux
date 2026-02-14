@@ -1,0 +1,19 @@
+extern "C"
+    fn printf(fmt: *Char, ...) -> Int
+
+trait Printable
+    fn show(self) -> Int
+
+type Point
+    x: Int
+    y: Int
+
+fn Point.show(self) -> Int
+    printf("Point(%d, %d)", self.x, self.y)
+    return 0
+
+fn main() -> Int
+    let p = Point(10, 20)
+    p.show()
+    printf("\n")
+    return 0

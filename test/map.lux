@@ -1,0 +1,10 @@
+extern "C"
+    fn printf(fmt: *Char, ...) -> Int
+
+fn main() -> Int
+    let ages = {1: 10, 2: 20, 3: 30}
+    printf("ages[1] = %d\n", ages[1])
+    printf("ages[2] = %d\n", ages[2])
+    printf("ages[3] = %d\n", ages[3])
+
+    return 0

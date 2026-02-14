@@ -1,0 +1,37 @@
+extern "C"
+    fn printf(fmt: *Char, ...) -> Int
+
+type Color
+    Red
+    Green
+    Blue
+
+type Option
+    Some(Int)
+    Nothing
+
+fn print_color(c: Color)
+    match c
+        Red -> printf("Red\n")
+        Green -> printf("Green\n")
+        Blue -> printf("Blue\n")
+
+fn print_option(o: Option)
+    match o
+        Some(x) -> printf("Some(%d)\n", x)
+        Nothing -> printf("Nothing\n")
+
+fn main() -> Int
+    let r = Red
+    let g = Green
+    let b = Blue
+    print_color(r)
+    print_color(g)
+    print_color(b)
+
+    let s = Some(42)
+    let n = Nothing
+    print_option(s)
+    print_option(n)
+
+    return 0

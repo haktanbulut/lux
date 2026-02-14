@@ -1,0 +1,12 @@
+extern "C"
+    fn printf(fmt: *Char, ...) -> Int
+
+fn factorial(n: Int) -> Int
+    if n <= 1
+        return 1
+    return n * factorial(n - 1)
+
+fn main() -> Int
+    let result: Int = factorial(10)
+    printf("factorial(10) = %ld\n", result)
+    return 0

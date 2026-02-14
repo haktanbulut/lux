@@ -1,0 +1,5 @@
+lux
+output
+*.o
+.claude/
+CLAUDE.md

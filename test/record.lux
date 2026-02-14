@@ -1,0 +1,20 @@
+extern "C"
+    fn printf(fmt: *Char, ...) -> Int
+
+type Point
+    x: Int
+    y: Int
+
+fn print_point(p: Point)
+    printf("Point(%d, %d)\n", p.x, p.y)
+
+fn main() -> Int
+    let p = Point(10, 20)
+    print_point(p)
+    printf("x = %d, y = %d\n", p.x, p.y)
+
+    var q = Point(1, 2)
+    q.x = 100
+    printf("after mutation: x = %d, y = %d\n", q.x, q.y)
+
+    return 0

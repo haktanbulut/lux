@@ -1,0 +1,18 @@
+extern "C"
+    fn printf(fmt: *Char, ...) -> Int
+
+fn main() -> Int
+    var sum = 0
+    for i in 0..5
+        sum += i
+    printf("sum 0..5 = %d\n", sum)
+
+    var sum2 = 0
+    for i in 0..=5
+        sum2 += i
+    printf("sum 0..=5 = %d\n", sum2)
+
+    for i in 1..4
+        printf("i = %d\n", i)
+
+    return 0
