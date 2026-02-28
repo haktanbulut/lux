@@ -1,0 +1,312 @@
+extern "C"
+    fn printf(fmt: *Char, ...) -> Int
+
+-- TRAITS
+trait Describable
+    fn describe(self) -> Int
+
+-- RECORDS
+type Hero
+    name: *Char
+    hp: Int
+    attack: Int
+    defense: Int
+    level: Int
+
+type Vec2
+    x: Float
+    y: Float
+
+-- ENUMS / ADTs
+type Weapon
+    Sword
+    Bow
+    Staff
+    Dagger(Int)
+
+type Class
+    Warrior
+    Ranger
+    Mage
+
+-- GENERICS
+fn clamp[T](val: T, lo: T, hi: T) -> T
+    if val < lo
+        return lo
+    if val > hi
+        return hi
+    return val
+
+fn max_val[T](a: T, b: T) -> T
+    if a > b
+        return a
+    return b
+
+-- METHODS
+fn Hero.describe(self) -> Int
+    printf("    Hero(%s): HP=%d  ATK=%d  DEF=%d  LVL=%d\n",
+           self.name, self.hp, self.attack, self.defense, self.level)
+    return 0
+
+fn Hero.power(self) -> Int
+    return self.attack * self.level - self.defense / 2
+
+fn Vec2.length_sq(self) -> Float
+    return self.x * self.x + self.y * self.y
+
+-- ENUM HELPERS  (block-form arms allow return statements)
+fn weapon_bonus(w: Weapon) -> Int
+    match w
+        Sword ->
+            return 10
+        Bow ->
+            return 7
+        Staff ->
+            return 12
+        Dagger(n) ->
+            return n
+    return 0
+
+fn class_label(c: Class) -> *Char
+    match c
+        Warrior ->
+            return "Warrior"
+        Ranger ->
+            return "Ranger"
+        Mage ->
+            return "Mage"
+    return "unknown"
+
+-- LAMBDA HELPERS
+fn apply_fn(f: fn(Int) -> Int, x: Int) -> Int
+    return f(x)
+
+fn double_it(x: Int) -> Int
+    return x * 2
+
+fn add_n(x: Int, n: Int) -> Int
+    return x + n
+
+-- COROUTINE WORKER
+fn compute_xp(level: Int) -> Int
+    return level * level * 100
+
+-- SECTION BANNER
+fn section(n: Int, title: *Char)
+    printf("\n  ================================================\n")
+    printf("  [%d] %s\n", n, title)
+    printf("  ================================================\n")
+
+-- PRINT WEAPON NAME helper
+fn print_weapon_info(label: *Char, bonus: Int)
+    printf("    %-12s bonus = %d\n", label, bonus)
+
+fn main() -> Int
+    printf("\n  ##################################################\n")
+    printf("  #       L U X   L A N G U A G E   T O U R       #\n")
+    printf("  #   Showcasing every major language feature      #\n")
+    printf("  ##################################################\n")
+
+    -- ---- 1. RECORDS -------------------------------------------
+    section(1, "Records  -  type Name with named fields")
+    printf("  Named-field value types, constructed positionally.\n")
+    let hero = Hero("Aria", 120, 45, 20, 5)
+    hero.describe()
+
+    -- ---- 2. METHODS -------------------------------------------
+    section(2, "Methods  -  fn Type.method(self, ...)")
+    printf("  Attach behaviour to a type; call with dot syntax.\n")
+    let power = hero.power()
+    printf("    hero.power()  =  attack*level - defense/2  =  %d\n", power)
+    let pos = Vec2(3.0, 4.0)
+    let lsq = pos.length_sq()
+    printf("    Vec2(3,4).length_sq()  =  %f   (expected 25.0)\n", lsq)
+
+    -- ---- 3. WITH EXPRESSIONS ----------------------------------
+    section(3, "With Expressions  -  functional record update")
+    printf("  Creates a new record with selected fields changed.\n")
+    let leveled = hero with {level: 10, hp: 200}
+    printf("  Original:  ")
+    hero.describe()
+    printf("  Leveled:   ")
+    leveled.describe()
+
+    -- ---- 4. ENUMS + PATTERN MATCHING --------------------------
+    section(4, "Enums / ADTs + Pattern Matching")
+    printf("  Algebraic data types, including data-carrying variants.\n")
+    let sword  = Sword
+    let bow    = Bow
+    let dagger = Dagger(15)
+    print_weapon_info("Sword",    weapon_bonus(sword))
+    print_weapon_info("Bow",      weapon_bonus(bow))
+    print_weapon_info("Dagger(15)", weapon_bonus(dagger))
+
+    printf("\n  Enum variant dispatch with match:\n")
+    let cls = Mage
+    match cls
+        Warrior -> printf("    -> fought as Warrior\n")
+        Ranger  -> printf("    -> fought as Ranger\n")
+        Mage    -> printf("    -> fought as Mage!\n")
+
+    printf("\n  Integer match with or-patterns and wildcard:\n")
+    let hit = 7
+    match hit
+        1 | 2 | 3 -> printf("    hit %d -> low tier\n", hit)
+        4 | 5 | 6 -> printf("    hit %d -> mid tier\n", hit)
+        _         -> printf("    hit %d -> high tier\n", hit)
+
+    printf("\n  Tuple pattern match:\n")
+    let coord = (1, 2)
+    match coord
+        (1, 2) -> printf("    matched (1, 2) exactly\n")
+        _      -> printf("    no match\n")
+
+    -- ---- 5. TRAITS --------------------------------------------
+    section(5, "Traits  -  interface declarations")
+    printf("  'trait T' declares a method that types must implement.\n")
+    printf("  Hero implements Describable  ->  fn Hero.describe(self)\n")
+    hero.describe()
+
+    -- ---- 6. GENERICS ------------------------------------------
+    section(6, "Generics  -  fn name[T](...) monomorphized at call sites")
+    printf("  One definition, specialized per concrete type used.\n")
+    let ci = clamp(150, 0, 100)
+    let cf = clamp(3.14, 0.0, 2.0)
+    let mi = max_val(7, 42)
+    let mf = max_val(1.5, 0.5)
+    printf("    clamp[Int](150, 0, 100)       = %d\n", ci)
+    printf("    clamp[Float](3.14, 0.0, 2.0)  = %f\n", cf)
+    printf("    max_val[Int](7, 42)           = %d\n", mi)
+    printf("    max_val[Float](1.5, 0.5)      = %f\n", mf)
+
+    -- ---- 7. TUPLES --------------------------------------------
+    section(7, "Tuples  -  multi-value grouping + destructuring")
+    printf("  Pack: (a, b, c)   Unpack: let (x, y, z) = t\n")
+    let stats = (45, 20, 5)
+    let (atk, def, lvl) = stats
+    printf("    let (atk, def, lvl) = (45, 20, 5)\n")
+    printf("    atk=%d  def=%d  lvl=%d\n", atk, def, lvl)
+    let pair = (99, 1)
+    let (big, small) = pair
+    printf("    (big, small) = (%d, %d)\n", big, small)
+
+    -- ---- 8. LISTS ---------------------------------------------
+    section(8, "Lists  -  heap-allocated arrays  [a, b, c]")
+    printf("  Index: list[i]   Length: list.len\n")
+    let scores = [100, 250, 80, 310, 175]
+    printf("    scores = [100, 250, 80, 310, 175]\n")
+    printf("    scores.len = %d\n", scores.len)
+    printf("    scores[0]=%d   scores[3]=%d\n", scores[0], scores[3])
+    var sum_s = 0
+    var idx = 0
+    loop
+        if idx >= scores.len
+            break
+        sum_s = sum_s + scores[idx]
+        idx = idx + 1
+    printf("    sum of all scores = %d\n", sum_s)
+
+    -- ---- 9. FOR LOOPS -----------------------------------------
+    section(9, "For Loops  -  for i in lo..hi")
+    printf("  Range iteration (exclusive upper bound).\n")
+    printf("  XP table (xp = level^2 * 100):\n")
+    for lv in 1..6
+        let xp = compute_xp(lv)
+        printf("    Level %d  ->  %d XP\n", lv, xp)
+
+    -- ---- 10. LIST COMPREHENSIONS -------------------------------
+    section(10, "List Comprehensions  -  [expr for i in range if cond]")
+    printf("  Build lists declaratively with an optional filter.\n")
+    let squares = [i * i for i in 0..6]
+    printf("    [i*i for i in 0..6]  =  ")
+    var sq_i = 0
+    loop
+        if sq_i >= squares.len
+            break
+        printf("%d ", squares[sq_i])
+        sq_i = sq_i + 1
+    printf("\n")
+    let evens = [i for i in 0..12 if i % 2 == 0]
+    printf("    [i for i in 0..12 if i%%2==0]  =  ")
+    var ev_i = 0
+    loop
+        if ev_i >= evens.len
+            break
+        printf("%d ", evens[ev_i])
+        ev_i = ev_i + 1
+    printf("\n")
+
+    -- ---- 11. MAPS ---------------------------------------------
+    section(11, "Maps  -  key->value literal and index access")
+    printf("  Integer key-value store with literal syntax.\n")
+    let tier_bonus = {1: 5, 2: 15, 3: 30, 4: 60, 5: 100}
+    printf("    tier_bonus[1] = %d\n", tier_bonus[1])
+    printf("    tier_bonus[3] = %d\n", tier_bonus[3])
+    printf("    tier_bonus[5] = %d\n", tier_bonus[5])
+
+    -- ---- 12. STRING INTERPOLATION -----------------------------
+    section(12, "String Interpolation  -  embed expressions in strings")
+    printf("  Any expression inside braces is evaluated and inlined.\n")
+    let hname = "Aria"
+    let hlevel = 10
+    let hpower = 45 * 10 - 20 / 2
+    let bio = "Hero {hname} at level {hlevel} has power {hpower}"
+    printf("    %s\n", bio)
+    let aa = 6
+    let bb = 7
+    let math_msg = "{aa} * {bb} = {aa * bb}"
+    printf("    %s\n", math_msg)
+
+    -- ---- 13. LAMBDAS ------------------------------------------
+    section(13, "Lambdas  -  fn(params) body as first-class values")
+    printf("  Anonymous functions passed to higher-order functions.\n")
+    let doubled = apply_fn(fn(x: Int) x * 2, 21)
+    let tripled = apply_fn(fn(x: Int) x * 3, 7)
+    printf("    apply_fn(fn(x) x*2, 21) = %d\n", doubled)
+    printf("    apply_fn(fn(x) x*3, 7)  = %d\n", tripled)
+
+    -- ---- 14. PIPE OPERATOR ------------------------------------
+    section(14, "Pipe Operator  -  val |> fn  or  val |> fn(extra)")
+    printf("  Threads a value left-to-right as the first argument.\n")
+    let piped1 = 5 |> double_it |> double_it
+    printf("    5 |> double_it |> double_it  =  %d\n", piped1)
+    let piped2 = 3 |> add_n(10)
+    printf("    3 |> add_n(10)  =  %d\n", piped2)
+
+    -- ---- 15. ASSERT -------------------------------------------
+    section(15, "Assert  -  assert <cond> aborts on failure")
+    printf("  Runtime invariant checks; program halts when false.\n")
+    assert hero.hp > 0
+    assert hero.level == 5
+    assert 2 + 2 == 4
+    assert clamp(50, 0, 100) == 50
+    assert max_val(1, 2) == 2
+    printf("    All assertions passed!\n")
+
+    -- ---- 16. DEFER --------------------------------------------
+    section(16, "Defer  -  runs at function exit in LIFO order")
+    printf("  Deferred statements execute in reverse order on return.\n")
+    printf("  Registering two defers now...\n")
+    defer printf("  [defer 1] Cleanup complete.\n")
+    defer printf("  [defer 2] Saving hero state...\n")
+    printf("    (defers queued - fire in LIFO order after final print)\n")
+
+    -- ---- 17. SPAWN / AWAIT ------------------------------------
+    section(17, "Spawn / Await  -  cooperative coroutines via ucontext")
+    printf("  'spawn fn(args)' starts a coroutine; 'await t' waits for result.\n")
+    let task1 = spawn compute_xp(5)
+    let task2 = spawn compute_xp(10)
+    let xp5  = await task1
+    let xp10 = await task2
+    printf("    spawn compute_xp(5)   -> await ->  %d XP\n", xp5)
+    printf("    spawn compute_xp(10)  -> await ->  %d XP\n", xp10)
+
+    printf("\n  ##################################################\n")
+    printf("  #                Tour complete!                  #\n")
+    printf("  #  records | methods | with | enums | match      #\n")
+    printf("  #  traits | generics | tuples | lists | maps     #\n")
+    printf("  #  for | comprehensions | interp | lambdas       #\n")
+    printf("  #  pipe | assert | defer | spawn/await           #\n")
+    printf("  ##################################################\n")
+
+    return 0
