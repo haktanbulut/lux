@@ -1,0 +1,73 @@
+extern "C"
+    fn printf(fmt: *Char, ...) -> Int
+    fn malloc(size: Int) -> *Char
+    fn lux_server_create(port: Int) -> Int
+    fn lux_server_accept(server_fd: Int) -> Int
+    fn lux_conn_read(fd: Int, buf: *Char, size: Int) -> Int
+    fn lux_conn_close(fd: Int) -> Int
+    fn lux_parse_path(req: *Char, out: *Char, maxlen: Int) -> Int
+    fn lux_streq(a: *Char, b: *Char) -> Int
+    fn lux_send_response(fd: Int, status: *Char, ctype: *Char, body: *Char)
+
+-- Coroutine: read one HTTP request, dispatch to a route, send response.
+fn handle_connection(fd: Int) -> Int
+    let buf = malloc(4096)
+    let n = lux_conn_read(fd, buf, 4096)
+    if n <= 0
+        lux_conn_close(fd)
+        return 1
+
+    let path = malloc(256)
+    lux_parse_path(buf, path, 256)
+    printf("  [coroutine fd=%d] %s\n", fd, path)
+
+    if lux_streq(path, "/") != 0
+        lux_send_response(fd, "200 OK", "text/html",
+            "<html><body><h1>Lux Web Server</h1><p>Routes: / &nbsp; /hello &nbsp; /status</p></body></html>")
+    elif lux_streq(path, "/hello") != 0
+        let greeting = "Hello, World! Greetings from a Lux coroutine."
+        lux_send_response(fd, "200 OK", "text/plain", greeting)
+    elif lux_streq(path, "/status") != 0
+        lux_send_response(fd, "200 OK", "text/plain", "status: ok\nlang: lux\ncoroutines: ucontext")
+    else
+        lux_send_response(fd, "404 Not Found", "text/plain", "404 - route not found")
+
+    lux_conn_close(fd)
+    return 0
+
+fn main() -> Int
+    let port = 8080
+    printf("  =============================================\n")
+    printf("  Lux Coroutine Web Server\n")
+    printf("  http://localhost:%d\n", port)
+    printf("  Routes:\n")
+    printf("    GET /        -> HTML home page\n")
+    printf("    GET /hello   -> plain-text greeting\n")
+    printf("    GET /status  -> server status\n")
+    printf("  =============================================\n\n")
+
+    let server_fd = lux_server_create(port)
+    if server_fd < 0
+        printf("Error: could not bind port %d\n", port)
+        return 1
+
+    printf("Listening on fd=%d  (Ctrl+C to stop)\n\n", server_fd)
+
+    var count = 0
+    loop
+        printf("Waiting for request...\n")
+        let client_fd = lux_server_accept(server_fd)
+        if client_fd < 0
+            break
+
+        count = count + 1
+        printf("[#%d] Connection accepted fd=%d  -> spawn coroutine\n", count, client_fd)
+
+        -- Each connection is dispatched to a coroutine.
+        -- spawn returns a Task; await blocks until the coroutine completes.
+        let task = spawn handle_connection(client_fd)
+        let result = await task
+
+        printf("[#%d] Coroutine returned %d\n\n", count, result)
+
+    return 0
