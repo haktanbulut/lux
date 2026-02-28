@@ -927,6 +927,19 @@ static LLVMValueRef codegen_expr(Codegen *cg, AstNode *node) {
             is_ptr = true;
         }
 
+        if (obj_type && obj_type->kind == TY_LIST) {
+            const char *fname = cg_intern(cg, node->as.field_access.field.name,
+                                          node->as.field_access.field.len);
+            const char *len_str = str_intern(cg->interns, "len");
+            if (fname == len_str) {
+                /* list.len — extract field 0 (i64 len) from {i64 len, i64 cap, ptr data} */
+                LLVMValueRef obj = codegen_expr(cg, node->as.field_access.object);
+                if (!obj) return NULL;
+                return LLVMBuildExtractValue(cg->builder, obj, 0, "list.len");
+            }
+            return NULL;
+        }
+
         if (obj_type && obj_type->kind == TY_RECORD) {
             const char *fname = cg_intern(cg, node->as.field_access.field.name,
                                           node->as.field_access.field.len);
@@ -2234,6 +2247,48 @@ static void codegen_stmt(Codegen *cg, AstNode *node) {
                         if (node->as.assign.op == TOK_ASSIGN) {
                             LLVMBuildStore(cg->builder, val, gep);
                         }
+                    }
+                }
+            }
+        } else if (node->as.assign.target->kind == NODE_INDEX) {
+            /* List index assignment: list[i] = value */
+            AstNode *idx_node = node->as.assign.target;
+            Type *obj_type = idx_node->as.index.object->checked_type ?
+                             type_resolve(idx_node->as.index.object->checked_type) : NULL;
+            if (obj_type && obj_type->kind == TY_LIST) {
+                Type *elem_type = obj_type->as.list.elem;
+                LLVMTypeRef elem_llvm_ty = llvm_type(cg, elem_type);
+                LLVMTypeRef list_llvm_ty = llvm_type(cg, obj_type);
+                LLVMTypeRef ptr_ty = LLVMPointerTypeInContext(cg->ctx, 0);
+
+                /* Get the list alloca */
+                LLVMValueRef list_alloca = NULL;
+                if (idx_node->as.index.object->kind == NODE_IDENT) {
+                    const char *obj_name = cg_intern(cg,
+                        idx_node->as.index.object->as.ident.name,
+                        idx_node->as.index.object->as.ident.len);
+                    list_alloca = get_value(cg, obj_name);
+                }
+                if (list_alloca) {
+                    /* Load data pointer (field 2) */
+                    LLVMValueRef data_gep = LLVMBuildStructGEP2(cg->builder, list_llvm_ty,
+                                                                  list_alloca, 2, "data.gep");
+                    LLVMValueRef data_ptr = LLVMBuildLoad2(cg->builder, ptr_ty, data_gep, "data.ptr");
+
+                    /* Compute byte offset */
+                    LLVMValueRef idx = codegen_expr(cg, idx_node->as.index.index);
+                    if (idx) {
+                        LLVMTargetDataRef td = LLVMGetModuleDataLayout(cg->module);
+                        unsigned long long elem_size = LLVMABISizeOfType(td, elem_llvm_ty);
+                        LLVMValueRef byte_offset = LLVMBuildMul(cg->builder, idx,
+                            LLVMConstInt(LLVMInt64TypeInContext(cg->ctx), elem_size, 0), "byte.off");
+                        LLVMValueRef byte_off32 = LLVMBuildTrunc(cg->builder, byte_offset,
+                            LLVMInt32TypeInContext(cg->ctx), "off32");
+                        LLVMValueRef elem_ptr = LLVMBuildGEP2(cg->builder,
+                            LLVMInt8TypeInContext(cg->ctx), data_ptr, &byte_off32, 1, "elem.ptr");
+
+                        /* Store value */
+                        LLVMBuildStore(cg->builder, val, elem_ptr);
                     }
                 }
             }

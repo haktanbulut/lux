@@ -13,16 +13,11 @@ gcc -Wall -Wextra -std=c11 -O2 -c \
     "$SCRIPT_DIR/raylib_wrapper.c" \
     -o /tmp/raylib_wrapper.o
 
-echo "==> Compiling asteroids game engine..."
-gcc -Wall -Wextra -std=c11 -O2 -c \
-    "$SCRIPT_DIR/asteroids_game.c" \
-    -o /tmp/asteroids_game.o
-
 echo "==> Compiling asteroids.lux..."
 "$ROOT/lux" "$SCRIPT_DIR/asteroids.lux" 2>/dev/null || true
 
-echo "==> Linking everything with raylib..."
-cc /tmp/lux_output.o /tmp/lux_runtime.o /tmp/raylib_wrapper.o /tmp/asteroids_game.o \
+echo "==> Linking with raylib..."
+cc /tmp/lux_output.o /tmp/lux_runtime.o /tmp/raylib_wrapper.o \
     -lraylib -lGL -lm -lpthread -ldl -lrt \
     -o "$ROOT/asteroids"
 

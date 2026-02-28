@@ -636,6 +636,18 @@ static Type *synth_expr(Checker *c, AstNode *node) {
                     result = type_error();
                 }
             }
+        } else if (obj_type->kind == TY_LIST) {
+            const char *fname = str_intern_range(c->interns,
+                node->as.field_access.field.name,
+                node->as.field_access.field.len);
+            if (fname == str_intern(c->interns, "len")) {
+                result = type_int();
+            } else {
+                check_error(c, node->loc, "no field '%.*s' on List type",
+                            node->as.field_access.field.len,
+                            node->as.field_access.field.name);
+                result = type_error();
+            }
         } else if (obj_type->kind == TY_TUPLE) {
             check_error(c, node->loc, "use indexing to access tuple elements");
             result = type_error();
@@ -1138,6 +1150,20 @@ static void check_stmt(Checker *c, AstNode *node) {
                 Symbol *sym = symtab_lookup(&c->symtab, oname);
                 if (sym && !sym->is_mutable) {
                     check_error(c, node->loc, "cannot assign to field of immutable variable '%.*s'",
+                                obj->as.ident.len, obj->as.ident.name);
+                }
+            }
+        } else if (node->as.assign.target->kind == NODE_INDEX) {
+            /* List element mutation is allowed even on immutable bindings,
+             * because it modifies the shared heap buffer, not the binding.
+             * Only require mutability for non-list indexed types. */
+            AstNode *obj = node->as.assign.target->as.index.object;
+            Type *obj_type = obj->checked_type ? type_resolve(obj->checked_type) : NULL;
+            if (obj->kind == NODE_IDENT && (!obj_type || obj_type->kind != TY_LIST)) {
+                const char *oname = str_intern_range(c->interns, obj->as.ident.name, obj->as.ident.len);
+                Symbol *sym = symtab_lookup(&c->symtab, oname);
+                if (sym && !sym->is_mutable) {
+                    check_error(c, node->loc, "cannot assign to element of immutable variable '%.*s'",
                                 obj->as.ident.len, obj->as.ident.name);
                 }
             }

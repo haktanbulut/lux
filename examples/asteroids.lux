@@ -9,38 +9,286 @@ extern "C"
     fn lux_is_key_down(key: Int) -> Int
     fn lux_is_key_pressed(key: Int) -> Int
     fn lux_get_frame_time() -> Float
+    fn lux_draw_text(text: *Char, x: Int, y: Int, size: Int, r: Int, g: Int, b: Int, a: Int)
+    fn lux_draw_fps(x: Int, y: Int)
+    fn lux_draw_triangle(x1: Float, y1: Float, x2: Float, y2: Float, x3: Float, y3: Float, r: Int, g: Int, b: Int, a: Int)
+    fn lux_draw_triangle_lines(x1: Float, y1: Float, x2: Float, y2: Float, x3: Float, y3: Float, r: Int, g: Int, b: Int, a: Int)
+    fn lux_draw_circle(x: Float, y: Float, radius: Float, r: Int, g: Int, b: Int, a: Int)
+    fn lux_draw_circle_lines(x: Float, y: Float, radius: Float, r: Int, g: Int, b: Int, a: Int)
+    fn lux_draw_line_ex(x1: Float, y1: Float, x2: Float, y2: Float, thick: Float, r: Int, g: Int, b: Int, a: Int)
+    fn lux_measure_text(text: *Char, size: Int) -> Int
+    fn lux_sin(x: Float) -> Float
+    fn lux_cos(x: Float) -> Float
+    fn lux_sqrt(x: Float) -> Float
+    fn lux_random(min: Int, max: Int) -> Int
+    fn lux_int_to_float(x: Int) -> Float
+    fn snprintf(buf: *Char, size: Int, fmt: *Char, ...) -> Int
+    fn malloc(size: Int) -> *Char
 
-    fn game_init()
-    fn game_reset()
-    fn game_ship_thrust(dt: Float)
-    fn game_ship_rotate(dir: Float, dt: Float)
-    fn game_shoot()
-    fn game_update_ship(dt: Float) -> Int
-    fn game_update_bullets(dt: Float) -> Int
-    fn game_update_asteroids(dt: Float) -> Int
-    fn game_maybe_spawn(dt: Float) -> Int
-    fn game_check_collisions() -> Int
-    fn game_draw_ship()
-    fn game_draw_asteroids()
-    fn game_draw_bullets()
-    fn game_draw_hud()
-    fn game_get_score() -> Int
-    fn game_is_over() -> Int
-    fn game_get_lives() -> Int
+type Ship
+    x: Float
+    y: Float
+    dx: Float
+    dy: Float
+    angle: Float
+    alive: Int
+    shoot_timer: Float
 
-fn update_physics(dt: Float) -> Int
-    game_update_bullets(dt)
-    game_update_asteroids(dt)
-    return 0
+type Asteroid
+    x: Float
+    y: Float
+    dx: Float
+    dy: Float
+    radius: Float
+    active: Int
 
-fn handle_spawning(dt: Float) -> Int
-    game_maybe_spawn(dt)
-    return 0
+type Bullet
+    x: Float
+    y: Float
+    dx: Float
+    dy: Float
+    life: Float
+    active: Int
+
+fn deg2rad(d: Float) -> Float
+    return d * 3.14159265358979 / 180.0
+
+fn wrap_x(x: Float) -> Float
+    if x < 0.0 - 50.0
+        return x + 900.0
+    if x > 850.0
+        return x - 900.0
+    return x
+
+fn wrap_y(y: Float) -> Float
+    if y < 0.0 - 50.0
+        return y + 700.0
+    if y > 650.0
+        return y - 700.0
+    return y
+
+fn find_inactive_asteroid(asteroids: [Asteroid]) -> Int
+    var i = 0
+    loop
+        if i >= asteroids.len
+            return 0 - 1
+        if asteroids[i].active == 0
+            return i
+        i = i + 1
+
+fn spawn_asteroid_at(asteroids: [Asteroid], x: Float, y: Float, radius: Float)
+    let idx = find_inactive_asteroid(asteroids)
+    if idx < 0
+        return
+    let a = deg2rad(lux_int_to_float(lux_random(0, 360)))
+    let spd = 40.0 + lux_int_to_float(lux_random(0, 80))
+    asteroids[idx] = Asteroid(x, y, lux_cos(a) * spd, lux_sin(a) * spd, radius, 1)
+
+fn update_ship(ship: Ship, dt: Float) -> Ship
+    if ship.alive == 0
+        return ship
+    let nx = wrap_x(ship.x + ship.dx * dt)
+    let ny = wrap_y(ship.y + ship.dy * dt)
+    let ndx = ship.dx * 0.98
+    let ndy = ship.dy * 0.98
+    var st = ship.shoot_timer - dt
+    if st < 0.0
+        st = 0.0
+    return Ship(nx, ny, ndx, ndy, ship.angle, ship.alive, st)
+
+fn update_bullets(bullets: [Bullet], dt: Float)
+    var i = 0
+    loop
+        if i >= bullets.len
+            return
+        if bullets[i].active != 0
+            let b = bullets[i]
+            let nx = b.x + b.dx * dt
+            let ny = b.y + b.dy * dt
+            let nl = b.life - dt
+            if nl <= 0.0
+                bullets[i] = b with {active: 0}
+            elif nx < 0.0 - 20.0
+                bullets[i] = b with {active: 0}
+            elif nx > 820.0
+                bullets[i] = b with {active: 0}
+            elif ny < 0.0 - 20.0
+                bullets[i] = b with {active: 0}
+            elif ny > 620.0
+                bullets[i] = b with {active: 0}
+            else
+                bullets[i] = Bullet(nx, ny, b.dx, b.dy, nl, 1)
+        i = i + 1
+
+fn update_asteroids(asteroids: [Asteroid], dt: Float)
+    var i = 0
+    loop
+        if i >= asteroids.len
+            return
+        if asteroids[i].active != 0
+            let a = asteroids[i]
+            let nx = wrap_x(a.x + a.dx * dt)
+            let ny = wrap_y(a.y + a.dy * dt)
+            asteroids[i] = Asteroid(nx, ny, a.dx, a.dy, a.radius, 1)
+        i = i + 1
+
+fn check_collisions(asteroids: [Asteroid], bullets: [Bullet], ship: Ship, score: Int, lives: Int, game_over: Int) -> (Int, Int, Int, Ship)
+    var sc = score
+    var lv = lives
+    var go = game_over
+    var sh = ship
+
+    var bi = 0
+    loop
+        if bi >= bullets.len
+            break
+        if bullets[bi].active != 0
+            var ai = 0
+            loop
+                if ai >= asteroids.len
+                    break
+                if asteroids[ai].active != 0
+                    let ddx = bullets[bi].x - asteroids[ai].x
+                    let ddy = bullets[bi].y - asteroids[ai].y
+                    let dist = lux_sqrt(ddx * ddx + ddy * ddy)
+                    if dist < asteroids[ai].radius
+                        bullets[bi] = bullets[bi] with {active: 0}
+                        let r = asteroids[ai].radius
+                        let ax = asteroids[ai].x
+                        let ay = asteroids[ai].y
+                        asteroids[ai] = asteroids[ai] with {active: 0}
+                        if r >= 39.0
+                            spawn_asteroid_at(asteroids, ax, ay, 20.0)
+                            spawn_asteroid_at(asteroids, ax, ay, 20.0)
+                            sc = sc + 20
+                        elif r >= 19.0
+                            spawn_asteroid_at(asteroids, ax, ay, 10.0)
+                            spawn_asteroid_at(asteroids, ax, ay, 10.0)
+                            sc = sc + 50
+                        else
+                            sc = sc + 100
+                        break
+                ai = ai + 1
+        bi = bi + 1
+
+    if sh.alive != 0
+        if go == 0
+            var ai = 0
+            loop
+                if ai >= asteroids.len
+                    break
+                if asteroids[ai].active != 0
+                    let ddx = sh.x - asteroids[ai].x
+                    let ddy = sh.y - asteroids[ai].y
+                    let dist = lux_sqrt(ddx * ddx + ddy * ddy)
+                    if dist < asteroids[ai].radius + 10.0
+                        lv = lv - 1
+                        if lv <= 0
+                            sh = sh with {alive: 0}
+                            go = 1
+                        else
+                            sh = Ship(400.0, 300.0, 0.0, 0.0, sh.angle, 1, sh.shoot_timer)
+                        break
+                ai = ai + 1
+
+    return (sc, lv, go, sh)
+
+fn draw_ship(ship: Ship)
+    if ship.alive == 0
+        return
+    let r = deg2rad(ship.angle)
+    let cr = lux_cos(r)
+    let sr = lux_sin(r)
+
+    let nose_x = ship.x + cr * 16.0
+    let nose_y = ship.y + sr * 16.0
+    let left_x = ship.x + lux_cos(r + 2.4) * 13.0
+    let left_y = ship.y + lux_sin(r + 2.4) * 13.0
+    let right_x = ship.x + lux_cos(r - 2.4) * 13.0
+    let right_y = ship.y + lux_sin(r - 2.4) * 13.0
+
+    lux_draw_triangle(nose_x, nose_y, right_x, right_y, left_x, left_y, 220, 220, 255, 255)
+    lux_draw_triangle_lines(nose_x, nose_y, right_x, right_y, left_x, left_y, 255, 255, 255, 255)
+
+    let speed = lux_sqrt(ship.dx * ship.dx + ship.dy * ship.dy)
+    if speed > 30.0
+        let tail_x = ship.x - cr * 12.0
+        let tail_y = ship.y - sr * 12.0
+        lux_draw_line_ex(left_x, left_y, tail_x, tail_y, 2.0, 255, 160, 50, 200)
+        lux_draw_line_ex(right_x, right_y, tail_x, tail_y, 2.0, 255, 160, 50, 200)
+
+fn draw_asteroids(asteroids: [Asteroid])
+    var i = 0
+    loop
+        if i >= asteroids.len
+            return
+        if asteroids[i].active != 0
+            lux_draw_circle_lines(asteroids[i].x, asteroids[i].y, asteroids[i].radius, 180, 180, 180, 255)
+        i = i + 1
+
+fn draw_bullets(bullets: [Bullet])
+    var i = 0
+    loop
+        if i >= bullets.len
+            return
+        if bullets[i].active != 0
+            lux_draw_circle(bullets[i].x, bullets[i].y, 2.5, 255, 255, 100, 255)
+        i = i + 1
+
+fn draw_hud(score: Int, lives: Int, game_over: Int)
+    let buf = malloc(64)
+    snprintf(buf, 64, "Score: %d", score)
+    lux_draw_text(buf, 10, 10, 22, 220, 220, 220, 255)
+
+    var i = 0
+    loop
+        if i >= lives
+            break
+        let bx = 10.0 + lux_int_to_float(i) * 25.0
+        let by = 42.0
+        lux_draw_triangle(bx + 6.0, by, bx + 12.0, by + 14.0, bx, by + 14.0, 180, 180, 220, 255)
+        i = i + 1
+
+    if game_over != 0
+        let msg = "GAME OVER"
+        let w = lux_measure_text(msg, 44)
+        lux_draw_text(msg, 400 - w / 2, 265, 44, 230, 41, 55, 255)
+        let msg2 = "Press R to restart"
+        let w2 = lux_measure_text(msg2, 22)
+        lux_draw_text(msg2, 400 - w2 / 2, 320, 22, 180, 180, 180, 255)
+
+    lux_draw_fps(710, 10)
+
+fn make_ship() -> Ship
+    return Ship(400.0, 300.0, 0.0, 0.0, 0.0 - 90.0, 1, 0.0)
 
 fn main() -> Int
     lux_init_window(800, 600, "Lux Asteroids")
     lux_set_target_fps(60)
-    game_init()
+
+    var ship = make_ship()
+    var asteroids = [Asteroid(0.0, 0.0, 0.0, 0.0, 0.0, 0) for i in 0..24]
+    var bullets = [Bullet(0.0, 0.0, 0.0, 0.0, 0.0, 0) for i in 0..20]
+    var score = 0
+    var game_over = 0
+    var lives = 3
+    var spawn_timer = 0.0
+
+    var si = 0
+    loop
+        if si >= 5
+            break
+        let ax = lux_int_to_float(lux_random(0, 800))
+        let ay = lux_int_to_float(lux_random(0, 600))
+        let ddx = ax - 400.0
+        let ddy = ay - 300.0
+        var sx = ax
+        var sy = ay
+        if lux_sqrt(ddx * ddx + ddy * ddy) < 120.0
+            sx = ax + 160.0
+            sy = ay + 160.0
+        spawn_asteroid_at(asteroids, sx, sy, 40.0)
+        si = si + 1
 
     loop
         if lux_window_should_close() != 0
@@ -48,34 +296,91 @@ fn main() -> Int
 
         let dt = lux_get_frame_time()
 
-        if game_is_over() != 0
+        if game_over != 0
             if lux_is_key_pressed(82) != 0
-                game_reset()
+                ship = make_ship()
+                var ri = 0
+                loop
+                    if ri >= asteroids.len
+                        break
+                    asteroids[ri] = Asteroid(0.0, 0.0, 0.0, 0.0, 0.0, 0)
+                    ri = ri + 1
+                var rj = 0
+                loop
+                    if rj >= bullets.len
+                        break
+                    bullets[rj] = Bullet(0.0, 0.0, 0.0, 0.0, 0.0, 0)
+                    rj = rj + 1
+                score = 0
+                game_over = 0
+                lives = 3
+                spawn_timer = 0.0
+                var si2 = 0
+                loop
+                    if si2 >= 5
+                        break
+                    let ax2 = lux_int_to_float(lux_random(0, 800))
+                    let ay2 = lux_int_to_float(lux_random(0, 600))
+                    spawn_asteroid_at(asteroids, ax2, ay2, 40.0)
+                    si2 = si2 + 1
         else
             if lux_is_key_down(265) != 0
-                game_ship_thrust(dt)
+                if ship.alive != 0
+                    let thr = deg2rad(ship.angle)
+                    ship = ship with {dx: ship.dx + lux_cos(thr) * 200.0 * dt, dy: ship.dy + lux_sin(thr) * 200.0 * dt}
             if lux_is_key_down(263) != 0
-                game_ship_rotate(-1.0, dt)
+                if ship.alive != 0
+                    ship = ship with {angle: ship.angle - 200.0 * dt}
             if lux_is_key_down(262) != 0
-                game_ship_rotate(1.0, dt)
+                if ship.alive != 0
+                    ship = ship with {angle: ship.angle + 200.0 * dt}
             if lux_is_key_pressed(32) != 0
-                game_shoot()
+                if ship.alive != 0
+                    if ship.shoot_timer <= 0.0
+                        ship = ship with {shoot_timer: 0.15}
+                        let shr = deg2rad(ship.angle)
+                        var fi = 0
+                        loop
+                            if fi >= bullets.len
+                                break
+                            if bullets[fi].active == 0
+                                let bx = ship.x + lux_cos(shr) * 15.0
+                                let by = ship.y + lux_sin(shr) * 15.0
+                                let bdx = lux_cos(shr) * 400.0 + ship.dx * 0.3
+                                let bdy = lux_sin(shr) * 400.0 + ship.dy * 0.3
+                                bullets[fi] = Bullet(bx, by, bdx, bdy, 2.0, 1)
+                                break
+                            fi = fi + 1
 
-        let t_phys = spawn update_physics(dt)
-        let t_spawn = spawn handle_spawning(dt)
-        game_update_ship(dt)
-        await t_phys
-        await t_spawn
+        ship = update_ship(ship, dt)
+        update_bullets(bullets, dt)
+        update_asteroids(asteroids, dt)
 
-        let t_coll = spawn game_check_collisions()
-        let hits = await t_coll
+        spawn_timer = spawn_timer + dt
+        if spawn_timer >= 2.5
+            spawn_timer = spawn_timer - 2.5
+            let edge = lux_random(0, 3)
+            if edge == 0
+                spawn_asteroid_at(asteroids, 0.0, lux_int_to_float(lux_random(0, 600)), 40.0)
+            elif edge == 1
+                spawn_asteroid_at(asteroids, 800.0, lux_int_to_float(lux_random(0, 600)), 40.0)
+            elif edge == 2
+                spawn_asteroid_at(asteroids, lux_int_to_float(lux_random(0, 800)), 0.0, 40.0)
+            else
+                spawn_asteroid_at(asteroids, lux_int_to_float(lux_random(0, 800)), 600.0, 40.0)
+
+        let result = check_collisions(asteroids, bullets, ship, score, lives, game_over)
+        score = result[0]
+        lives = result[1]
+        game_over = result[2]
+        ship = result[3]
 
         lux_begin_drawing()
         lux_clear_background(10, 10, 20, 255)
-        game_draw_asteroids()
-        game_draw_bullets()
-        game_draw_ship()
-        game_draw_hud()
+        draw_asteroids(asteroids)
+        draw_bullets(bullets)
+        draw_ship(ship)
+        draw_hud(score, lives, game_over)
         lux_end_drawing()
 
     lux_close_window()
